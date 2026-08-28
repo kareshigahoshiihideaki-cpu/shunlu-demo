@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多级漏斗前置筛选架构 · 百万级行程实时匹配</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Noto Sans SC', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0f172a;
+    min-height: 100vh;
+    color: #e2e8f0;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px; }
+  h1 {
+    font-size: 24px; font-weight: 800; margin: 0;
+    background: linear-gradient(135deg, #f43f5e, #f97316, #eab308, #22c55e, #6366f1);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .sub { font-size: 13px; color: #64748b; margin-top: 6px; }
+  .center { text-align: center; margin-bottom: 24px; }
+
+  .kpi-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .kpi-card { flex: 1 1 160px; border-radius: 12px; padding: 12px 16px; }
+  .kpi-label { font-size: 10px; font-weight: 600; margin-bottom: 4px; }
+  .kpi-value { font-size: 20px; font-weight: 800; }
+  .kpi-note { font-size: 11px; color: #94a3b8; }
+
+  .panel {
+    background: rgba(255,255,255,0.03); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  .panel-title { font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 10px; }
+
+  .bar-row { display: flex; gap: 4px; align-items: flex-end; height: 56px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; gap: 3px; }
+  .bar-val { font-size: 9px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bar { width: 100%; border-radius: 4px; transition: all 0.3s; }
+  .bar-id { font-size: 9px; font-weight: 600; }
+
+  .body-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .arch-col { flex: 0 0 200px; }
+  .detail-col { flex: 1 1 360px; min-width: 300px; }
+  svg { display: block; }
+
+  .stage-card {
+    background: #fff; border-radius: 14px; padding: 16px;
+    border: 1.5px solid rgba(0,0,0,0.1); box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  }
+  .stage-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .stage-badge {
+    width: 36px; height: 36px; border-radius: 10px; color: #fff; font-weight: 800;
+    font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .stage-name { font-size: 15px; font-weight: 700; color: #1e293b; }
+  .stage-sub { font-size: 11px; color: #94a3b8; }
+  .stage-desc {
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+    font-size: 13px; color: #475569; line-height: 1.7;
+  }
+  .algo-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .algo-bar { width: 4px; height: 14px; border-radius: 2px; display: inline-block; }
+  .algo-title { font-size: 13px; font-weight: 700; }
+  .algo-list { display: flex; flex-direction: column; gap: 4px; padding-left: 10px; margin-bottom: 12px; }
+  .algo-step { display: flex; gap: 8px; font-size: 12.5px; color: #475569; line-height: 1.6; }
+  .algo-num { font-weight: 700; flex-shrink: 0; width: 18px; text-align: right; }
+
+  .tech-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tech-card {
+    flex: 1 1 180px; padding: 8px 12px; border-radius: 8px;
+    background: #f8fafc; border: 1px solid #e2e8f0;
+  }
+  .tech-label { font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 2px; }
+  .tech-value { font-size: 12px; color: #1e293b; font-weight: 600; line-height: 1.5; }
+  .tech-mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+
+  .insight {
+    background: #fffbeb; border-radius: 10px; padding: 10px 14px;
+    border: 1px solid rgba(245,158,11,0.2);
+  }
+  .insight-title { font-size: 11px; font-weight: 700; color: #d97706; margin-bottom: 3px; }
+  .insight-body { font-size: 12.5px; color: #475569; line-height: 1.65; }
+
+  .metric-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .metric-card {
+    flex: 1 1 100px; text-align: center; padding: 10px 6px;
+    border-radius: 10px; border: 1px solid rgba(0,0,0,0.1);
+  }
+  .metric-value { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .metric-label { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+  .section-title { font-size: 14px; font-weight: 800; margin-bottom: 10px; }
+  .principle {
+    display: flex; gap: 12px; padding: 10px 14px; border-radius: 10px; margin-bottom: 8px;
+  }
+  .principle-title { font-size: 12px; font-weight: 800; flex-shrink: 0; width: 100px; }
+  .principle-desc { font-size: 12.5px; color: #94a3b8; line-height: 1.6; }
+  .geohash-text { font-size: 12px; color: #94a3b8; line-height: 1.7; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+
+<script>
+// ============================================================
+// 数据引擎：100万条乘客行程的筛选过程
+// ============================================================
+const TOTAL_PASSENGERS = 1000000;
+
+const PIPELINE_STAGES = [
+  {
+    id: "L0", name: "Geohash 网格粗筛", subtitle: "空间哈希索引 · O(1)查找",
+    color: "#f43f5e", icon: "#", survivalRate: 0.08, timePerRecord: 0.00005,
+    desc: "将地图划分为 Geohash 网格（如精度6级约1.2km×0.6km），司机的起终点所在网格及其8邻域组成候选网格集。只有起点或终点落在候选网格内的乘客行程才进入下一轮。",
+    algorithm: [
+      "预处理：对所有乘客行程的起点和终点计算 Geohash 编码，建立 Geohash → 行程ID 的倒排索引",
+      "查询：计算司机起点 Geohash 及其8邻域（9个网格），计算司机终点同理",
+      "取起点命中集合 ∪ 终点命中集合 = L0候选集",
+      "Geohash精度选择：城区用精度6（~1.2km），郊区/高速用精度5（~5km）",
+    ],
+    complexity: "O(1) 哈希查找，不遍历任何乘客",
+    keyInsight: "不是对100万条逐条判断，而是直接从倒排索引中取出候选集。这是整个流水线最关键的加速——从 O(N) 降到 O(1)。",
+    dataStructure: "HashMap<Geohash, List<TripID>>，内存约 50MB/百万条",
+  },
+  {
+    id: "L1", name: "OD包围盒相交", subtitle: "矩形重叠检测 · O(1)/条",
+    color: "#f97316", icon: "□", survivalRate: 0.35, timePerRecord: 0.001,
+    desc: "对司机和乘客分别构造OD包围盒(Bounding Box)，检测两个矩形是否有交集。无交集说明路线在空间上完全不相关，直接淘汰。",
+    algorithm: [
+      "计算司机OD包围盒：bbox_d = (min_lat, min_lng, max_lat, max_lng)，向外扩展缓冲距离 Δ（如3km）",
+      "计算乘客OD包围盒：bbox_p = (min_lat, min_lng, max_lat, max_lng)",
+      "矩形相交判断：!(bbox_p.max_lat < bbox_d.min_lat || bbox_p.min_lat > bbox_d.max_lat || bbox_p.max_lng < bbox_d.min_lng || bbox_p.min_lng > bbox_d.max_lng)",
+      "不相交 → 淘汰",
+    ],
+    complexity: "O(1) 四次比较",
+    keyInsight: "包围盒比 Geohash 更精细——Geohash 只看端点是否在网格内，包围盒判断整条路线的空间范围是否有交集，过滤掉「端点在附近但路线完全不重叠」的情况。",
+    dataStructure: "每条行程存4个float坐标，无额外索引",
+  },
+  {
+    id: "L2", name: "OD方向角快筛", subtitle: "航向角差值 · O(1)/条",
+    color: "#eab308", icon: "→", survivalRate: 0.45, timePerRecord: 0.002,
+    desc: "计算司机和乘客的OD航向角(bearing)，如果角度差超过阈值（如60°），说明大方向不一致，直接淘汰。比余弦相似度更快——只需一次 atan2 和一次减法。",
+    algorithm: [
+      "计算司机航向角 θ_d = atan2(D_d.lng - O_d.lng, D_d.lat - O_d.lat)",
+      "计算乘客航向角 θ_p = atan2(D_p.lng - O_p.lng, D_p.lat - O_p.lat)",
+      "角度差 Δθ = |θ_d - θ_p|，若 Δθ > 180° 则 Δθ = 360° - Δθ",
+      "若 Δθ > 60°（可调阈值）→ 淘汰",
+    ],
+    complexity: "O(1) 一次atan2 + 一次减法",
+    keyInsight: "这是D1余弦相似度的极简替代品——航向角差值只需要4个坐标和一次反三角函数，而余弦相似度需要点积和两次模长计算。在粗筛阶段不需要精确的余弦值，只需要知道方向是否大致一致。",
+    dataStructure: "可预计算每条行程的航向角，存1个float",
+  },
+  {
+    id: "L3", name: "端点距离快检", subtitle: "上下车点近似距离 · O(1)/条",
+    color: "#22c55e", icon: "⊕", survivalRate: 0.50, timePerRecord: 0.005,
+    desc: "快速检查乘客上车点和下车点到司机路线的近似距离。使用司机路线的简化表示（如仅保留5-10个关键折点），计算端点到最近折点的距离，超过阈值则淘汰。",
+    algorithm: [
+      "预处理：将司机路径简化为 K 个关键折点（Douglas-Peucker 算法，K≈5~10）",
+      "对乘客上车点 P_pickup，计算到K个折点的最小距离 d_min_pickup",
+      "对乘客下车点 P_dropoff，同理计算 d_min_dropoff",
+      "若 min(d_min_pickup, d_min_dropoff) > maxDetour → 淘汰",
+      "maxDetour 阈值如 5km（城区）或 15km（长途）",
+    ],
+    complexity: "O(K) 其中 K=5~10，近似 O(1)",
+    keyInsight: "不使用完整路径（可能有数百个点），而是用路径简化后的少量折点做粗略距离判断。这比计算点到完整polyline的投影距离快50~100倍。允许有假阳性（距离被高估），但不会有假阴性。",
+    dataStructure: "司机路径简化为K个坐标点",
+  },
+  {
+    id: "L4", name: "六维精细评分", subtitle: "完整算法 · O(n×m)/条",
+    color: "#6366f1", icon: "★", survivalRate: 1.0, timePerRecord: 0.5,
+    desc: "对通过所有前置筛选的候选行程，执行完整的六维评分算法（余弦相似度、路径重叠率、绕行系数、分段方向一致性、时序一致性、起终点偏离度），输出精确的顺路度分数。",
+    algorithm: [
+      "D1: OD向量余弦相似度",
+      "D2: 路径重叠率（逐段采样匹配）",
+      "D3: 绕行系数（端点投影距离）",
+      "D4: 分段方向一致性（逐段方向余弦加权）",
+      "D5: 时序一致性（投影点顺序校验）",
+      "D6: 起终点偏离度（归一化距离惩罚）",
+      "综合加权 + 时序硬约束乘法因子",
+    ],
+    complexity: "O(n×m) 其中n,m为路径段数",
+    keyInsight: "经过四层筛选后，100万条通常只剩1400~2800条需要精细计算。六维算法的计算量从不可承受（~140CPU小时）降到约1.4秒，实现实时响应。",
+    dataStructure: "完整路径polyline + 预计算数据",
+  },
+];
+
+// 计算每层的存活数量和累计时间
+function computePipelineStats() {
+  let remaining = TOTAL_PASSENGERS;
+  const stats = [];
+  let totalTime = 0;
+  for (let i = 0; i < PIPELINE_STAGES.length; i++) {
+    const stage = PIPELINE_STAGES[i];
+    const input = remaining;
+    const time = i === 0 ? 0.5 : input * stage.timePerRecord;
+    totalTime += time;
+    remaining = i === PIPELINE_STAGES.length - 1
+      ? remaining
+      : Math.round(input * stage.survivalRate);
+    stats.push(Object.assign({}, stage, {
+      input, output: remaining,
+      eliminated: input - remaining,
+      stageTime: time, cumTime: totalTime,
+    }));
+  }
+  return stats;
+}
+
+const stats = computePipelineStats();
+const totalTime = stats[stats.length - 1].cumTime;
+const finalCount = stats[stats.length - 1].output;
+const bruteForceTime = TOTAL_PASSENGERS * 0.5; // ms
+const speedup = bruteForceTime / totalTime;
+
+function fmt(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+function fmtInt(n) {
+  if (n >= 1e6) return '1M';
+  if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+  return String(n);
+}
+
+// ============================================================
+// 渲染函数
+// ============================================================
+
+// 全局性能概览
+function renderKpis() {
+  const totalTimeStr = totalTime < 1000 ? totalTime.toFixed(0) + 'ms' : (totalTime / 1000).toFixed(1) + 's';
+  const speedupStr = speedup >= 1000 ? (speedup / 1000).toFixed(1) + 'K' : speedup.toFixed(0) + 'x';
+  return `
+  <div class="kpi-row">
+    <div class="kpi-card" style="background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.15)">
+      <div class="kpi-label" style="color:#f43f5e">暴力计算</div>
+      <div class="kpi-value" style="color:#f43f5e">${(bruteForceTime / 1000).toFixed(0)}s</div>
+      <div class="kpi-note">100万×0.5ms/条</div>
+    </div>
+    <div class="kpi-card" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15)">
+      <div class="kpi-label" style="color:#6366f1">漏斗筛选</div>
+      <div class="kpi-value" style="color:#6366f1">${totalTimeStr}</div>
+      <div class="kpi-note">${finalCount}条精细计算</div>
+    </div>
+    <div class="kpi-card" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.15)">
+      <div class="kpi-label" style="color:#22c55e">加速比</div>
+      <div class="kpi-value" style="color:#22c55e">${speedupStr}</div>
+      <div class="kpi-note">性能提升倍数</div>
+    </div>
+  </div>`;
+}
+
+// 数据量逐层缩减（柱状）
+function renderBars(activeStage) {
+  return `
+  <div class="panel">
+    <div class="panel-title">数据量逐层缩减</div>
+    <div class="bar-row">
+      ${stats.map((s, i) => {
+        const h = Math.max(8, 56 * (s.input / TOTAL_PASSENGERS));
+        const isActive = activeStage === i;
+        return `<div class="bar-col" data-stage="${i}">
+          <div class="bar-val" style="color:${isActive ? s.color : '#64748b'}">${fmtInt(s.input)}</div>
+          <div class="bar" style="height:${h}px;background:${isActive ? s.color : s.color + '40'}"></div>
+          <div class="bar-id" style="color:${isActive ? '#e2e8f0' : '#475569'}">${s.id}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// 架构流程图
+function archDiagram(activeStage) {
+  const stages = [
+    { id: "L0", label: "Geohash\n索引查找", color: "#f43f5e", y: 20 },
+    { id: "L1", label: "包围盒\n相交检测", color: "#f97316", y: 75 },
+    { id: "L2", label: "方向角\n快速筛选", color: "#eab308", y: 130 },
+    { id: "L3", label: "端点距离\n粗检", color: "#22c55e", y: 185 },
+    { id: "L4", label: "六维精细\n评分", color: "#6366f1", y: 240 },
+  ];
+  const w = 90, h = 42, x = 115;
+  let body = `<text x="160" y="14" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="600">100万条乘客行程</text>`;
+  stages.forEach((s, i) => {
+    const isActive = activeStage === i;
+    if (i > 0) {
+      body += `<line x1="160" y1="${s.y - 13}" x2="160" y2="${s.y}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+    }
+    body += `<g data-stage="${i}" style="cursor:pointer">
+      <rect x="${x}" y="${s.y}" width="${w}" height="${h}" rx="8"
+        fill="${isActive ? s.color : '#fff'}" stroke="${s.color}" stroke-width="${isActive ? 2 : 1.5}"/>
+      ${s.label.split("\n").map((line, li) =>
+        `<text x="${x + w / 2}" y="${s.y + 16 + li * 14}" text-anchor="middle"
+          fill="${isActive ? '#fff' : '#1e293b'}" font-size="11" font-weight="600">${line}</text>`
+      ).join('')}
+      ${i < 4 ? `
+        <line x1="${x + w + 4}" y1="${s.y + h / 2}" x2="${x + w + 35}" y2="${s.y + h / 2}"
+          stroke="${s.color}" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="${x + w + 40}" y="${s.y + h / 2 + 4}" fill="${s.color}" font-size="9" font-weight="600">淘汰</text>` : ''}
+      <text x="${x - 8}" y="${s.y + h / 2 + 4}" text-anchor="end" fill="#94a3b8" font-size="9">${s.id}</text>
+    </g>`;
+  });
+  body += `<text x="160" y="288" text-anchor="middle" fill="#6366f1" font-size="10" font-weight="700">Top-N 顺路匹配结果</text>`;
+  return `<svg viewBox="0 0 320 290" style="width:100%;max-width:340px;margin:0 auto">${body}</svg>`;
+}
+
+// Geohash 示意图
+function geohashDiagram() {
+  const hotCells = [[1,2],[1,3],[1,4],[2,2],[2,3],[2,4],[3,2],[3,3],[3,4],[2,5],[2,6],[3,5],[3,6],[4,5],[4,6]];
+  const driverCells = [[2,3],[3,5]];
+  let body = '';
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 8; c++) {
+      const x = c * 40 + 10, y = r * 35 + 10;
+      const hot = hotCells.some(([hr, hc]) => hr === r && hc === c);
+      const driver = driverCells.some(([dr, dc]) => dr === r && dc === c);
+      body += `<rect x="${x}" y="${y}" width="38" height="33" rx="3"
+        fill="${driver ? '#3b82f6' : hot ? '#f43f5e18' : '#f8fafc'}"
+        stroke="${hot ? '#f43f5e' : '#e2e8f0'}" stroke-width="${hot ? 1.5 : 0.5}"/>`;
+      if (driver) {
+        body += `<text x="${x + 19}" y="${y + 20}" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${r === 2 ? 'D起' : 'D终'}</text>`;
+      }
+    }
+  }
+  body += `<line x1="149" y1="97" x2="229" y2="132" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,3"/>`;
+  body += `<text x="170" y="228" text-anchor="middle" fill="#64748b" font-size="10">红框 = 候选网格（起/终点9邻域），蓝格 = 司机起终点所在格</text>`;
+  return `<svg viewBox="0 0 340 240" style="width:100%;max-width:360px;margin:0 auto">${body}</svg>`;
+}
+
+// 阶段详情卡
+function metricCard(label, value, unit, accent) {
+  return `<div class="metric-card" style="background:${accent}0a;border-color:${accent}20">
+    <div class="metric-value" style="color:${accent}">${value}</div>
+    <div class="metric-label">${unit ? `<span style="font-size:11px;color:${accent};font-weight:600">${unit} </span>` : ''}${label}</div>
+  </div>`;
+}
+
+function stageDetail(s) {
+  return `
+  <div class="stage-card" style="border-color:${s.color}25;box-shadow:0 4px 16px ${s.color}10">
+    <div class="stage-head">
+      <div class="stage-badge" style="background:${s.color}">${s.id}</div>
+      <div>
+        <div class="stage-name">${s.name}</div>
+        <div class="stage-sub">${s.subtitle}</div>
+      </div>
+    </div>
+
+    <div class="stage-desc" style="background:${s.color}08;border:1px solid ${s.color}15">${s.desc}</div>
+
+    <div class="algo-head">
+      <span class="algo-bar" style="background:${s.color}"></span>
+      <span class="algo-title" style="color:${s.color}">算法步骤</span>
+    </div>
+    <div class="algo-list">
+      ${s.algorithm.map((step, i) => `
+        <div class="algo-step">
+          <span class="algo-num" style="color:${s.color}">${i + 1}.</span>
+          <span>${step}</span>
+        </div>`).join('')}
+    </div>
+
+    <div class="tech-row">
+      <div class="tech-card">
+        <div class="tech-label">时间复杂度</div>
+        <div class="tech-value tech-mono">${s.complexity}</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-label">数据结构</div>
+        <div class="tech-value">${s.dataStructure}</div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <div class="insight-title">设计关键洞察</div>
+      <div class="insight-body">${s.keyInsight}</div>
+    </div>
+
+    <div class="metric-row">
+      ${metricCard('输入', fmtInt(s.input), '条', '#64748b')}
+      ${metricCard('淘汰', fmt(s.eliminated), '条', s.color)}
+      ${metricCard('存活', fmtInt(s.output), '条', '#10b981')}
+      ${metricCard('耗时', s.stageTime < 1 ? s.stageTime.toFixed(2) : s.stageTime.toFixed(1), 'ms', '#6366f1')}
+    </div>
+  </div>`;
+}
+
+// 设计原则
+const PRINCIPLES = [
+  { title: '越先越便宜', color: '#f43f5e', desc: '前置层用 O(1) 计算淘汰最多数据，后置层用 O(n×m) 精细算法处理极少量候选。每层计算成本递增，但数据量递减。' },
+  { title: '宁可漏过，不可误杀', color: '#f97316', desc: '前置筛选允许假阳性（不顺路的漏进来），但不允许假阴性（顺路的被错杀）。因此每层阈值都略宽松，由最后一层精确判断。' },
+  { title: '索引驱动 > 遍历过滤', color: '#22c55e', desc: 'L0 用倒排索引而非遍历，这是本质区别。100万条遍历过滤需 50ms，索引查找只需 0.5ms，差 100 倍。' },
+  { title: '可调参数化', color: '#6366f1', desc: '每层阈值（Geohash精度、包围盒缓冲距离、角度阈值、距离上限）都是可配置参数，可根据城市特征和业务数据调优，平衡召回率和计算成本。' },
+];
+
+function render(activeStage) {
+  const s = stats[activeStage];
+  return `
+    <div class="center">
+      <h1>多级漏斗前置筛选架构</h1>
+      <p class="sub">百万级行程实时匹配 · 五层渐进式过滤流水线</p>
+    </div>
+    ${renderKpis()}
+    ${renderBars(activeStage)}
+    <div class="body-row">
+      <div class="arch-col panel">
+        <div class="panel-title">流水线架构</div>
+        ${archDiagram(activeStage)}
+      </div>
+      <div class="detail-col">${stageDetail(s)}</div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title" style="color:#f43f5e">L0 Geohash 索引示意图</div>
+      ${geohashDiagram()}
+      <div class="geohash-text">Geohash 将二维坐标编码为字符串（如 "wx4g0e"），相邻网格共享前缀。通过预建倒排索引 Map&lt;geohash, tripIDs&gt;，查询时直接用司机起终点的 geohash 及 8 邻域作为 key 查找，<strong style="color:#f43f5e">无需遍历任何乘客数据</strong>，从 O(N) 降到 O(1)。这是百万级匹配能实时响应的基础。</div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">漏斗设计核心原则</div>
+      ${PRINCIPLES.map(p => `
+        <div class="principle" style="background:${p.color}08;border:1px solid ${p.color}18">
+          <span class="principle-title" style="color:${p.color}">${p.title}</span>
+          <span class="principle-desc">${p.desc}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ============================================================
+// 挂载与交互
+// ============================================================
+const root = document.getElementById('root');
+let activeStage = 0;
+
+function mount() {
+  root.innerHTML = render(activeStage);
+  root.querySelectorAll('[data-stage]').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.getAttribute('data-stage'), 10);
+      if (idx !== activeStage) { activeStage = idx; mount(); }
+    });
+  });
+}
+
+mount();
+</script>
+</body>
+</html>
