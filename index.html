@@ -49,6 +49,8 @@ nav::-webkit-scrollbar{display:none}
 nav button{background:rgba(255,255,255,.55);border:1px solid transparent;color:var(--muted);padding:8px 15px;border-radius:10px;cursor:pointer;font-size:13px;white-space:nowrap;transition:.25s;letter-spacing:.3px}
 nav button:hover{color:var(--text);background:rgba(255,255,255,.9);border-color:var(--line)}
 nav button.on{color:#fff;background:linear-gradient(135deg,#00b894,#0090b8);border-color:rgba(0,150,120,.4);box-shadow:0 4px 14px rgba(0,160,130,.3)}
+nav a.nav-ext{display:flex;align-items:center;gap:4px;background:rgba(0,150,120,.10);border:1px solid rgba(0,150,120,.35);color:var(--green);padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none;transition:.25s;letter-spacing:.3px;margin-left:6px;flex-shrink:0}
+nav a.nav-ext:hover{color:#fff;background:linear-gradient(135deg,#00b894,#0090b8);border-color:rgba(0,150,120,.4);box-shadow:0 4px 14px rgba(0,160,130,.3)}
 .badge-src{font-size:11px;color:var(--muted);border:1px solid var(--line2);border-radius:99px;padding:5px 12px;white-space:nowrap;background:rgba(255,255,255,.55)}
 .badge-src b{color:var(--green)}
 
@@ -333,6 +335,7 @@ footer::before{content:'';position:absolute;top:-1px;left:0;right:0;height:1px;
     <button data-s="s3">④ 匹配推送模拟</button>
     <button data-s="s4">⑤ 效果预估</button>
     <button data-s="s5">⑥ 落地路线</button>
+    <a class="nav-ext" href="filtering-pipeline.html" target="_blank">漏斗架构技术详解 ↗</a>
   </nav>
   <div class="badge-src">DATA · <b>58.4 万真实订单</b>（8 天：07-13~16、07-22~24、08-01）</div>
 </div></header>
